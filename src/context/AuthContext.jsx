@@ -336,8 +336,7 @@ useEffect(() => {
       } else {
         // In web browser, redirect to Google OAuth
         const redirectUri = `${window.location.origin}/auth/google-redirect`;
-        // window.location.href = `${API_BASE_URL}/auth/google?redirect_uri=${encodeURIComponent(redirectUri)}`;
-         window.location.href = `${API_BASE_URL}/auth/google`;
+        window.location.href = `${API_BASE_URL}/auth/google?redirect_uri=${encodeURIComponent(redirectUri)}`;
       }
     } catch (error) {
       console.error('Login failed:', error);
