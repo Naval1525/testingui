@@ -1,6 +1,7 @@
 import { createContext, useState, useEffect } from 'react';
 import { API_BASE_URL } from '../lib/axiosInstance';
 
+
 const AuthContext = createContext();
 
 export { AuthContext };
