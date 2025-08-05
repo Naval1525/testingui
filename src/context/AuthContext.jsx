@@ -222,10 +222,11 @@ export const AuthProvider = ({ children }) => {
 useEffect(() => {
   if (isElectron) return; // skip if running inside Electron
   
-  if (window.location.pathname === '/auth/google-redirect') {
+  const currentPath = window.location.pathname;
+  if (currentPath.startsWith('/auth/google-redirect')) {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const userStr = params.get('user');
+    const token = params.get('token') || params.get('access_token');
+    const userStr = params.get('user') || params.get('user_data');
     const error = params.get('error');
 
     if (error) {
@@ -240,8 +241,8 @@ useEffect(() => {
       }
     }
     
-    // Clean up URL
-    window.history.replaceState({}, document.title, '/');
+    // Redirect to home and clean up URL (full reload ensures all state is fresh)
+    window.location.replace('/');
   }
 }, []);
 
