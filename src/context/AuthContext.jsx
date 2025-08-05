@@ -218,34 +218,46 @@ export const AuthProvider = ({ children }) => {
   // Check if we're running in Electron
   const isElectron = window.electronAPI && window.electronAPI.req;
 
-  // Handle OAuth callback in browser mode
-useEffect(() => {
-  if (isElectron) return; // skip if running inside Electron
-  
-  const currentPath = window.location.pathname;
-  if (currentPath.startsWith('/auth/google-redirect')) {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token') || params.get('access_token');
-    const userStr = params.get('user') || params.get('user_data');
-    const error = params.get('error');
+  // Handle OAuth callback in browser mode - UPDATED for new web endpoints
+  useEffect(() => {
+    if (isElectron) return; // skip if running inside Electron
+    
+    // Updated to handle the new callback path from web-google-redirect
+    if (window.location.pathname === '/auth/callback') {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      const userStr = params.get('user');
+      const error = params.get('error');
 
-    if (error) {
-      console.error('OAuth error:', error);
-      // Handle error (show toast, redirect to login, etc.)
-    } else if (token) {
-      try {
-        const user = userStr ? JSON.parse(decodeURIComponent(userStr)) : null;
-        handleAuthSuccess({ access_token: token, user });
-      } catch (err) {
-        console.error('Failed to parse user data', err);
+      if (error) {
+        console.error('OAuth error:', error);
+        setError('Authentication failed. Please try again.');
+        // Redirect to home or login page
+        window.history.replaceState({}, document.title, '/');
+      } else if (token) {
+        try {
+          const user = userStr ? JSON.parse(decodeURIComponent(userStr)) : null;
+          handleAuthSuccess({ access_token: token, user });
+          console.log('Web authentication successful');
+        } catch (err) {
+          console.error('Failed to parse user data', err);
+          setError('Failed to process authentication data.');
+        }
       }
+      
+      // Clean up URL and redirect to home
+      window.history.replaceState({}, document.title, '/');
     }
     
-    // Redirect to home and clean up URL (full reload ensures all state is fresh)
-    window.location.replace('/');
-  }
-}, []);
-
+    // Handle error callback
+    if (window.location.pathname === '/auth/error') {
+      const params = new URLSearchParams(window.location.search);
+      const error = params.get('error');
+      console.error('Authentication error:', error);
+      setError('Authentication failed. Please try again.');
+      window.history.replaceState({}, document.title, '/');
+    }
+  }, []);
 
   // Keep the user object persisted so it survives full application restarts
   useEffect(() => {
@@ -319,13 +331,14 @@ useEffect(() => {
     }
   };
 
+  // UPDATED LOGIN METHOD - Now uses the new web-google endpoint
   const login = async () => {
     try {
       setError(null);
       setLoading(true);
       
       if (isElectron) {
-        // In Electron, trigger the login flow through IPC
+        // In Electron, trigger the login flow through IPC (unchanged)
         if (window.electronAPI.req.auth) {
           const result = await window.electronAPI.req.auth.initiateLogin();
           if (result.status === 0) {
@@ -335,9 +348,8 @@ useEffect(() => {
           throw new Error('Authentication not available in Electron');
         }
       } else {
-        // In web browser, redirect to Google OAuth
-        const redirectUri = `${window.location.origin}/auth/google-redirect`;
-        window.location.href = `${API_BASE_URL}/auth/google?redirect_uri=${encodeURIComponent(redirectUri)}`;
+        // UPDATED: Use the new web-google endpoint instead of the old one
+        window.location.href = `${API_BASE_URL}/auth/web-google`;
       }
     } catch (error) {
       console.error('Login failed:', error);
@@ -371,7 +383,6 @@ useEffect(() => {
     login,
     logout,
     isAuthenticated: !!user && !!token,
-    handleAuthSuccess,
   };
 
   return (
@@ -379,4 +390,4 @@ useEffect(() => {
       {children}
     </AuthContext.Provider>
   );
-}; 
+};
