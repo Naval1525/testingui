@@ -371,6 +371,7 @@ useEffect(() => {
     login,
     logout,
     isAuthenticated: !!user && !!token,
+    handleAuthSuccess,
   };
 
   return (
