@@ -24,38 +24,42 @@ export const AuthProvider = ({ children }) => {
   // Check if we're running in Electron
   const isElectron = window.electronAPI && window.electronAPI.req;
 
-  // Handle OAuth callback in browser mode
+  // Handle OAuth callback in browser mode - simplified approach
   useEffect(() => {
     if (isElectron) return; // skip if running inside Electron
-    if (window.location.pathname === '/auth/google-redirect') {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
-      const accessToken = params.get('access_token') || params.get('token');
-
-      const finalizeWebLogin = async () => {
+    
+    // Check for token in URL parameters on any page
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    
+    if (token) {
+      // Store the token and set user as authenticated
+      setToken(token);
+      localStorage.setItem('authToken', token);
+      
+      // Fetch user info from backend using the token
+      const fetchUserInfo = async () => {
         try {
-          let tokenData = null;
-          if (code && !accessToken) {
-            // Exchange the code for JWT token via backend endpoint
-            const res = await fetch(`${API_BASE_URL}/auth/google-redirect?code=${encodeURIComponent(code)}`);
-            if (!res.ok) throw new Error('Token exchange failed');
-            tokenData = await res.json();
-          } else {
-            tokenData = { success: true, access_token: accessToken, user: null };
+          const response = await fetch(`${API_BASE_URL}/auth/status`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            setUser(data.user);
+            localStorage.setItem('authUser', JSON.stringify(data.user));
           }
-
-          if (tokenData && tokenData.success && tokenData.access_token) {
-            handleAuthSuccess({ access_token: tokenData.access_token, user: tokenData.user });
-          }
-        } catch (err) {
-          console.error('OAuth callback handling failed', err);
-        } finally {
-          // Clean up URL regardless of outcome
-          window.history.replaceState({}, document.title, '/');
+        } catch (error) {
+          console.error('Failed to fetch user info:', error);
         }
       };
-
-      finalizeWebLogin();
+      
+      fetchUserInfo();
+      
+      // Clean up URL - navigate to home page
+      window.history.replaceState({}, document.title, '/home');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -97,7 +101,12 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (error) {
         console.error('Failed to initialize auth:', error);
-        logout();
+        // Call logout function to clear state
+        setUser(null);
+        setToken(null);
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('authUser');
+        setError(null);
       } finally {
         setLoading(false);
       }
@@ -148,9 +157,8 @@ export const AuthProvider = ({ children }) => {
           throw new Error('Authentication not available in Electron');
         }
       } else {
-        // In web browser, redirect to Google OAuth
-        const redirectUri = `${window.location.origin}/auth/google-redirect`;
-        window.location.href = `${API_BASE_URL}/auth/google?redirect_uri=${encodeURIComponent(redirectUri)}`;
+        // In web browser, redirect to Google OAuth - simplified
+        window.location.href = `${API_BASE_URL}/auth/google`;
       }
     } catch (error) {
       console.error('Login failed:', error);
